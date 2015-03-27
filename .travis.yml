@@ -1,1 +1,5 @@
 language: clojure
+script:
+  - lein test
+  - lein bikeshed
+  - lein kibit
