@@ -1,5 +1,6 @@
 (ns linemode.drivers.star
-  (:require [linemode.core :refer [Printer run-program compile-commands shutdown]]
+  (:require [linemode.core :refer [run-program compile-commands shutdown
+                                   Printer]]
             [clojure.java.io :as io])
   (:import [java.io OutputStream]))
 
