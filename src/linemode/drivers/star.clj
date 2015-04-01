@@ -86,7 +86,7 @@
             :cut-partial [0x1b 0x64 0x03]
             :cut-through-immediate [0x1b 0x64 0x00]
             :cut-partial-immediate [0x1b 0x64 0x01])]
-      #(op-write-bytes opcode))))
+      #(op-write-bytes (byte-array opcode)))))
 
 
 (defn compile-command
