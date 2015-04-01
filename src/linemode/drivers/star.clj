@@ -4,7 +4,7 @@
   (:import [java.io OutputStream]))
 
 (def charset-codes
-  {"ascii" 0x00  ; TODO Normal is not ascii but something weird
+  {"ASCII" 0x00  ; TODO Normal is not ascii but something weird
    "Cp930" 0x02  ; TODO Katakana
    "Cp437" 0x03
    "Cp858" 0x04
