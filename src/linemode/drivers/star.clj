@@ -1,6 +1,7 @@
 (ns linemode.drivers.star
-  (:require [linemode.core :refer [Printer run-program compile-commands]]
-            [clojure.java.io :as io]))
+  (:require [linemode.core :refer [Printer run-program compile-commands shutdown]]
+            [clojure.java.io :as io])
+  (:import [java.io OutputStream]))
 
 (def charset-codes
   {"ascii" 0x00  ; TODO Normal is not ascii but something weird
@@ -45,25 +46,21 @@
    "Cp3041" 0x4f})
 
 
-(def initial-state {:charset "ASCII"
-                    :output []})
-
-
-(defn op-write-raw [bs]
-  (fn [state] state))
+(defn initial-state []
+  {:charset "ASCII"})
 
 (defn op-write-bytes [bs]
-  (fn [state] (update-in state [:output] (fn [output] (conj output bs)))))
-                         
+  (fn [state] [state bs]))
+
 (defn op-write [s]
-  (fn [state] ((op-write-bytes (.getBytes s (:charset state))) state)))
+  (fn [state] [state (.getBytes s (:charset state))]))
 
 ; TODO
 (defn op-barcode []
-  (fn [state] state))
+  (fn [state] [state (byte-array 0)]))
 
 (defn op-set-charset [charset]
-  (fn [state] state))
+  (fn [state] [state (byte-array 0)]))
 
 
 (defn get-command-builder
@@ -100,24 +97,42 @@
     (apply builder args)))
 
 
-(defn apply-command [state command]
-  ((compile-command command) state))
+(defn apply-command [[state outputs] command]
+  (let [[new-state new-output] ((compile-command command) state)]
+    [new-state (conj outputs new-output)]))
 
+(defn intermediate-compile-commands-with-state
+  (reductions (fn [[state _] command]
+                ((compile-command command) state))
+              [initial-state nil]
+              commands))
 
-(deftype StarPrinter [output-stream]
+(defrecord StarPrinter [output-stream]
   Printer
   (compile-commands [printer commands]
-    (:output (reduce apply-command initial-state commands)))
+    (reduce apply-command initial-state commands))
   (run-program [printer program]
-    ; TODO eager map
-    (doall (map #(.write output-stream %) program))
+    (doseq [[_ output] program]
+      (.write output-stream output))
+
     (.flush output-stream))
   (run-commands [printer commands]
     (run-program printer (compile-commands printer commands)))
   (shutdown [printer]
-    (.flush output-stream)
-    (.close output-stream)))
+    (.flush output-stream)))
 
 
-(defn star-printer
-  [output] (new StarPrinter output))
+(defmulti with-star-printer
+  (fn [obj f]
+    (class obj)))
+
+(defmethod with-star-printer String [path f]
+  (with-open [stream (io/output-stream path)]
+    (with-star-printer stream f)))
+
+(defmethod with-star-printer OutputStream [stream f]
+  (let [printer (StarPrinter. stream)]
+    (try
+      (f printer)
+      (finally
+        (shutdown printer)))))
