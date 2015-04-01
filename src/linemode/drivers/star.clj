@@ -46,21 +46,22 @@
    "Cp3041" 0x4f})
 
 
-(defn initial-state []
-  {:charset "ASCII"})
+(def initial-state
+  {:charset "ASCII"
+   :output []})
 
 (defn op-write-bytes [bs]
-  (fn [state] [state bs]))
+  (fn [state] (update-in state [:output] (fn [output] (conj output bs)))))
 
 (defn op-write [s]
-  (fn [state] [state (.getBytes s (:charset state))]))
+  (fn [state] ((op-write-bytes (.getBytes s (:charset state))) state)))
 
 ; TODO
 (defn op-barcode []
-  (fn [state] [state (byte-array 0)]))
+  (fn [state] state))
 
 (defn op-set-charset [charset]
-  (fn [state] [state (byte-array 0)]))
+  (fn [state] state))
 
 
 (defn get-command-builder
@@ -97,24 +98,17 @@
     (apply builder args)))
 
 
-(defn apply-command [[state outputs] command]
-  (let [[new-state new-output] ((compile-command command) state)]
-    [new-state (conj outputs new-output)]))
+(defn apply-command [state command]
+  ((compile-command command) state))
 
-(defn intermediate-compile-commands-with-state
-  (reductions (fn [[state _] command]
-                ((compile-command command) state))
-              [initial-state nil]
-              commands))
 
 (defrecord StarPrinter [output-stream]
   Printer
   (compile-commands [printer commands]
-    (reduce apply-command initial-state commands))
+    (:output (reduce apply-command initial-state commands)))
   (run-program [printer program]
-    (doseq [[_ output] program]
+    (doseq [output program]
       (.write output-stream output))
-
     (.flush output-stream))
   (run-commands [printer commands]
     (run-program printer (compile-commands printer commands)))
